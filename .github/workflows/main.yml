@@ -10,30 +10,36 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Clean and Patch Dependencies
+      - name: Patch and Clean Dependencies
         shell: pwsh
         run: |
-          # 1. Limpa qualquer configuração de Git residual de tentativas anteriores
-          git config --global --unset-all url.https://github.com/.insteadOf || $true
-          git config --global --unset-all url.ssh://git@github.com/.insteadOf || $true
-          
-          # 2. Lê o arquivo Cargo.toml
+          # 1. Remove o Cargo.lock se ele existir (força atualização das dependências)
+          if (Test-Path Cargo.lock) { Remove-Item Cargo.lock -Force }
+
+          # 2. Limpa configurações de Git antigas de forma segura
+          git config --global --remove-section url."https://github.com/" 2>$null
+          git config --global --remove-section url."ssh://git@github.com/" 2>$null
+          $LASTEXITCODE = 0 # Reseta o código de erro para o GitHub não achar que falhou
+
+          # 3. Lê e atualiza o Cargo.toml
           $toml = Get-Content Cargo.toml -Raw
           
-          # 3. Substitui os links mortos por mirrors da comunidade (pizofreude)
+          # Troca os links para mirrors ativos
           $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/libamx.git', 'https://github.com/pizofreude/libamx.git'
           $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/stx.git', 'https://github.com/pizofreude/stx.git'
           
-          # 4. REMOVE a trava de 'rev' (commit específico). 
-          # Isso força o Rust a pegar o código mais atual do mirror, evitando erro de "revision not found"
-          $toml = $toml -replace ', rev = "[a-z0-9]+"', ''
+          # Remove as travas de versão (rev) para evitar erros de commit não encontrado
+          $toml = $toml -replace ',\s*rev\s*=\s*"[a-z0-9]+"', ''
           
-          # 5. Salva o arquivo atualizado
           $toml | Set-Content Cargo.toml
-          Write-Host "Cargo.toml atualizado com novos mirrors e sem travas de versão."
+          
+          Write-Host "--- Cargo.toml Atualizado ---"
+          Get-Content Cargo.toml
+          Write-Host "-----------------------------"
 
       - name: Build STXTool
         env:
+          # Força o Cargo a usar o Git do sistema para baixar as dependências
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo build --release
 
