@@ -10,21 +10,27 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Patch Dependencies (Mirror Redirect)
+      - name: Clean and Patch Dependencies
         shell: pwsh
         run: |
-          # O repositório original sumiu, então vamos apontar para mirrors da comunidade
-          $toml = Get-Content Cargo.toml
+          # 1. Limpa qualquer configuração de Git residual de tentativas anteriores
+          git config --global --unset-all url.https://github.com/.insteadOf || $true
+          git config --global --unset-all url.ssh://git@github.com/.insteadOf || $true
           
-          # Troca o libamx para um mirror ativo
-          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/libamx.git', 'https://github.com/SudoICE/libamx.git'
+          # 2. Lê o arquivo Cargo.toml
+          $toml = Get-Content Cargo.toml -Raw
           
-          # Troca o stx para um mirror ativo
-          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/stx.git', 'https://github.com/SudoICE/stx.git'
+          # 3. Substitui os links mortos por mirrors da comunidade (pizofreude)
+          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/libamx.git', 'https://github.com/pizofreude/libamx.git'
+          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/stx.git', 'https://github.com/pizofreude/stx.git'
           
+          # 4. REMOVE a trava de 'rev' (commit específico). 
+          # Isso força o Rust a pegar o código mais atual do mirror, evitando erro de "revision not found"
+          $toml = $toml -replace ', rev = "[a-z0-9]+"', ''
+          
+          # 5. Salva o arquivo atualizado
           $toml | Set-Content Cargo.toml
-          
-          Write-Host "Cargo.toml atualizado com mirrors da comunidade."
+          Write-Host "Cargo.toml atualizado com novos mirrors e sem travas de versão."
 
       - name: Build STXTool
         env:
