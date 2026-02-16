@@ -10,26 +10,26 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Patch and Clean Dependencies
+      - name: Patch Dependencies (InFerno-AMX Mirrors)
         shell: pwsh
         run: |
-          # 1. Remove o Cargo.lock se ele existir (força atualização das dependências)
+          # 1. Remove o Cargo.lock para evitar conflitos de cache
           if (Test-Path Cargo.lock) { Remove-Item Cargo.lock -Force }
 
-          # 2. Limpa configurações de Git antigas de forma segura
-          git config --global --remove-section url."https://github.com/" 2>$null
-          git config --global --remove-section url."ssh://git@github.com/" 2>$null
-          $LASTEXITCODE = 0 # Reseta o código de erro para o GitHub não achar que falhou
+          # 2. Configura o Git para usar o Token do GitHub
+          # Isso ajuda a evitar o erro de "Username" mesmo em repositórios públicos
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
 
-          # 3. Lê e atualiza o Cargo.toml
+          # 3. Atualiza o Cargo.toml com mirrors da InFerno-AMX
           $toml = Get-Content Cargo.toml -Raw
           
-          # Troca os links para mirrors ativos
-          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/libamx.git', 'https://github.com/pizofreude/libamx.git'
-          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/stx.git', 'https://github.com/pizofreude/stx.git'
+          # Troca os links para mirrors que estão ONLINE no momento
+          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/libamx.git', 'https://github.com/InFerno-AMX/libamx.git'
+          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/stx.git', 'https://github.com/InFerno-AMX/stx.git'
           
-          # Remove as travas de versão (rev) para evitar erros de commit não encontrado
-          $toml = $toml -replace ',\s*rev\s*=\s*"[a-z0-9]+"', ''
+          # Remove a trava de versão (commit específico) para garantir que baixe o que estiver no mirror
+          $toml = $toml -replace ',\s*rev\s*=\s*"[a-f0-9]+"', ''
           
           $toml | Set-Content Cargo.toml
           
@@ -39,7 +39,6 @@ jobs:
 
       - name: Build STXTool
         env:
-          # Força o Cargo a usar o Git do sistema para baixar as dependências
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo build --release
 
