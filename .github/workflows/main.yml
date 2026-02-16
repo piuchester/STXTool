@@ -10,18 +10,24 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Patch Cargo.toml and Auth
+      - name: Patch Dependencies (Mirror Redirect)
         shell: pwsh
         run: |
-          # 1. Força a troca de SSH para HTTPS diretamente no arquivo de configuração do projeto
-          (Get-Content Cargo.toml) -replace 'ssh://git@github.com/', 'https://github.com/' | Set-Content Cargo.toml
+          # O repositório original sumiu, então vamos apontar para mirrors da comunidade
+          $toml = Get-Content Cargo.toml
           
-          # 2. Configura o Git para usar o Token interno do GitHub para evitar pedidos de login/senha
-          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          # Troca o libamx para um mirror ativo
+          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/libamx.git', 'https://github.com/SudoICE/libamx.git'
+          
+          # Troca o stx para um mirror ativo
+          $toml = $toml -replace 'ssh://git@github.com/StepMania-AMX/stx.git', 'https://github.com/SudoICE/stx.git'
+          
+          $toml | Set-Content Cargo.toml
+          
+          Write-Host "Cargo.toml atualizado com mirrors da comunidade."
 
       - name: Build STXTool
         env:
-          # Garante que o Cargo use o Git do sistema que configuramos acima
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo build --release
 
