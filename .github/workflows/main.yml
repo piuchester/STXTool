@@ -1,4 +1,4 @@
-name: Cloud Build
+name: Cloud Build Rust
 on: [push, workflow_dispatch]
 
 jobs:
@@ -6,10 +6,20 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Force HTTPS for Git dependencies
+        # Este comando diz ao Git: "Sempre que ver um link SSH do GitHub, use HTTPS no lugar"
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
       - name: Build STXTool
+        # Usamos uma variável de ambiente para garantir que o Cargo use o Git instalado no sistema
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo build --release
+
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
