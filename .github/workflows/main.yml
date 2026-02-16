@@ -10,13 +10,18 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Force HTTPS for Git dependencies
-        # Este comando diz ao Git: "Sempre que ver um link SSH do GitHub, use HTTPS no lugar"
-        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+      - name: Patch Cargo.toml and Auth
+        shell: pwsh
+        run: |
+          # 1. Força a troca de SSH para HTTPS diretamente no arquivo de configuração do projeto
+          (Get-Content Cargo.toml) -replace 'ssh://git@github.com/', 'https://github.com/' | Set-Content Cargo.toml
+          
+          # 2. Configura o Git para usar o Token interno do GitHub para evitar pedidos de login/senha
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Build STXTool
-        # Usamos uma variável de ambiente para garantir que o Cargo use o Git instalado no sistema
         env:
+          # Garante que o Cargo use o Git do sistema que configuramos acima
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo build --release
 
